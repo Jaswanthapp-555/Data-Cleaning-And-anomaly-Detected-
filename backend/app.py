@@ -13,8 +13,12 @@ def create_app():
     )
     app.config["MAX_CONTENT_LENGTH"] = 100 * 1024 * 1024  # 100 MB
     app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", os.urandom(24).hex())
-    app.config["UPLOAD_FOLDER"] = os.path.join(os.path.dirname(__file__), "..", "uploads")
-    os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+    upload_folder = "/tmp/uploads" if os.environ.get("VERCEL") else os.path.join(os.path.dirname(__file__), "..", "uploads")
+    app.config["UPLOAD_FOLDER"] = upload_folder
+    try:
+        os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+    except OSError:
+        pass
 
     CORS(app)
 
