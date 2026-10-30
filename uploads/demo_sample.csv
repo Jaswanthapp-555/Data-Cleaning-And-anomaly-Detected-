@@ -1,0 +1,6 @@
+id,mixed_floats,mixed_text_num,date_col,category
+101,10.0,100,2024-01-01,Tech
+102,25.5,200,2024-02-15,Finance
+103,30.75,pending,invalid_date,Healthcare
+104,40.0,400,2024-04-10,Tech
+105,55.2,unknown,2024-05-20,Finance

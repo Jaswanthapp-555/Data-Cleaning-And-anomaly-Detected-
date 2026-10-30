@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Automated Data Quality &amp; Anomaly Profiler</title>
+  <link rel="stylesheet" href="/static/css/main.css?v=2">
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+  <script>
+    (function () {
+      const savedTheme = localStorage.getItem("cleancore_theme") || "light";
+      document.documentElement.setAttribute("data-theme", savedTheme);
+    })();
+  </script>
+</head>
+
+<body>
+  <div class="app-layout">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="sidebar-brand-icon">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+          </svg>
+        </div>
+        <div>
+          <div class="brand-title">CleanCore</div>
+          <div class="brand-subtitle">Data Quality &amp; Profiler</div>
+        </div>
+      </div>
+      <div id="mode-badge" class="mode-badge"></div>
+      <nav id="sidebar-nav" style="flex:1"></nav>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <header class="topbar">
+        <div class="topbar-title" id="topbar-title">Automated Data Quality &amp; Anomaly Profiler</div>
+        <div class="topbar-actions">
+          <div class="topbar-info" id="topbar-info"></div>
+          <div class="theme-switcher" id="theme-switcher" role="group" aria-label="Theme Switcher">
+            <button class="theme-btn" data-theme="light" title="Light theme" type="button">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="5"></circle>
+                <line x1="12" y1="1" x2="12" y2="3"></line>
+                <line x1="12" y1="21" x2="12" y2="23"></line>
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                <line x1="1" y1="12" x2="3" y2="12"></line>
+                <line x1="21" y1="12" x2="23" y2="12"></line>
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+              </svg>
+              <span>Light</span>
+            </button>
+            <button class="theme-btn" data-theme="dark" title="Dark theme" type="button">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+              </svg>
+              <span>Dark</span>
+            </button>
+            <button class="theme-btn" data-theme="dim" title="Dim theme (Softer dark mode)" type="button">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="9"></circle>
+                <path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor"></path>
+              </svg>
+              <span>Dim</span>
+            </button>
+          </div>
+        </div>
+        <div id="toast-container"
+          style="position:fixed; top:1rem; right:1rem; z-index:2000; display:flex; flex-direction:column; gap:0.5rem">
+        </div>
+      </header>
+
+      <section class="page-content" id="page-content">
+        <div class="loading-overlay" style="min-height:300px">
+          <div class="spinner spinner-lg"></div>
+          <div class="loading-text">Initializing application...</div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Reusable Modal Backdrop -->
+  <div class="modal-backdrop hidden" id="modal-backdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title" id="modal-title">Modal Title</div>
+        <button class="modal-close" id="modal-close" aria-label="Close modal" title="Close modal">&times;</button>
+      </div>
+      <div class="modal-body" id="modal-body"></div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="modal-cancel">Cancel</button>
+        <button class="btn btn-primary" id="modal-confirm">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initApp } from "/static/js/app.js";
+    document.addEventListener("DOMContentLoaded", () => {
+      initApp();
+    });
+  </script>
+</body>
+
+</html>

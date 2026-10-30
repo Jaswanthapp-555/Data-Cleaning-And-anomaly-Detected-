@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% if data.dataset_label and data.dataset_label != 'Dataset' %}{{ data.dataset_label }} Quality Report{% else %}Data Quality Report{% endif %} — Automated Data Quality &amp; Anomaly Profiler</title>
+<style>
+  @page {
+    size: letter portrait;
+    margin: 1cm;
+  }
+  * { margin: 0; padding: 0; }
+  body {
+    font-family: Helvetica, Arial, sans-serif;
+    background: #f8fafc;
+    color: #1e293b;
+    font-size: 8.5pt;
+    line-height: 1.45;
+  }
+  .header {
+    background: #1e293b;
+    color: #ffffff;
+    padding: 14px 18px;
+    margin-bottom: 12px;
+  }
+  .header h1 {
+    font-size: 14pt;
+    font-weight: bold;
+    color: #ffffff;
+    margin-bottom: 3px;
+  }
+  .header p {
+    color: #94a3b8;
+    font-size: 7.5pt;
+  }
+  .container {
+    width: 100%;
+    margin: 0 auto;
+    padding: 0 4px;
+  }
+  .section {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+  }
+  .section h2 {
+    font-size: 10.5pt;
+    font-weight: bold;
+    color: #0f172a;
+    margin-bottom: 8px;
+    border-bottom: 2px solid #e2e8f0;
+    padding-bottom: 4px;
+  }
+  .section h3 {
+    font-size: 8.5pt;
+    font-weight: bold;
+    color: #334155;
+    margin: 8px 0 4px;
+  }
+
+  /* Explicit Table Structures for Summary Metrics */
+  table.metric-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 8px;
+  }
+  table.metric-table td {
+    padding: 6px 8px;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    vertical-align: top;
+  }
+  .stat-label {
+    font-size: 6.5pt;
+    color: #64748b;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 2px;
+  }
+  .stat-val {
+    font-size: 11pt;
+    font-weight: bold;
+    color: #0f172a;
+    line-height: 1.2;
+  }
+
+  /* Score Badges */
+  .score-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    font-weight: bold;
+    font-size: 9.5pt;
+  }
+  .score-excellent { background: #dcfce7; color: #15803d; }
+  .score-good { background: #dbeafe; color: #1d4ed8; }
+  .score-fair { background: #fef9c3; color: #a16207; }
+  .score-poor { background: #ffedd5; color: #c2410c; }
+  .score-critical { background: #fee2e2; color: #b91c1c; }
+  .score-na { background: #f1f5f9; color: #64748b; }
+
+  /* Standard Tables */
+  table.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 7.5pt;
+    margin-top: 4px;
+    margin-bottom: 6px;
+  }
+  table.data-table th {
+    background: #f1f5f9;
+    text-align: left;
+    padding: 4px 5px;
+    font-weight: bold;
+    color: #475569;
+    border-bottom: 1px solid #cbd5e1;
+    font-size: 7pt;
+    vertical-align: top;
+  }
+  table.data-table td {
+    padding: 4px 5px;
+    border-bottom: 1px solid #f1f5f9;
+    color: #334155;
+    vertical-align: top;
+    font-size: 7.5pt;
+  }
+
+  /* Dense Tables for High-Column Data (like Numerical Statistics) */
+  table.dense-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 6.8pt;
+    margin-top: 4px;
+  }
+  table.dense-table th {
+    background: #f1f5f9;
+    text-align: left;
+    padding: 3px 3px;
+    font-weight: bold;
+    color: #475569;
+    border-bottom: 1px solid #cbd5e1;
+    font-size: 6.5pt;
+    vertical-align: top;
+  }
+  table.dense-table td {
+    padding: 3px 3px;
+    border-bottom: 1px solid #f1f5f9;
+    color: #334155;
+    vertical-align: top;
+    font-size: 6.8pt;
+    line-height: 1.15;
+  }
+
+  /* Badges & Tags */
+  .badge {
+    display: inline-block;
+    padding: 1px 4px;
+    font-size: 6.5pt;
+    font-weight: bold;
+  }
+  .sev-critical { background: #fee2e2; color: #b91c1c; }
+  .sev-high { background: #ffedd5; color: #c2410c; }
+  .sev-medium { background: #fef9c3; color: #a16207; }
+  .sev-low { background: #dcfce7; color: #15803d; }
+  .sev-info { background: #dbeafe; color: #1d4ed8; }
+  .improvement { color: #15803d; font-weight: bold; font-size: 7.5pt; }
+  .decline { color: #b91c1c; font-weight: bold; font-size: 7.5pt; }
+  .neutral { color: #64748b; font-size: 7.5pt; }
+
+  .tag {
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    padding: 1px 4px;
+    font-size: 6.8pt;
+    display: inline-block;
+    margin: 1px 2px;
+  }
+  .added { background: #dcfce7; border-color: #86efac; color: #15803d; }
+  .removed { background: #fee2e2; border-color: #fca5a5; color: #b91c1c; }
+  .changed { background: #fef9c3; border-color: #fde047; color: #a16207; }
+
+  .chart-grid { width: 100%; margin-top: 4px; text-align: center; }
+  .chart-card { display: inline-block; vertical-align: top; width: 48%; margin: 3px; background: #f8fafc; border: 1px solid #e2e8f0; padding: 4px; text-align: center; }
+  .chart-card-full { display: block; width: 98%; margin: 6px auto; background: #f8fafc; border: 1px solid #e2e8f0; padding: 4px; text-align: center; }
+  .chart-img { max-width: 480px; }
+
+  .no-issues-box {
+    padding: 8px 10px;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #166534;
+    font-weight: bold;
+    font-size: 8pt;
+  }
+  .final-summary-box {
+    background: #f0fdf4;
+    border: 1px solid #86efac;
+    padding: 8px 12px;
+  }
+  .final-summary-box p {
+    font-size: 8.5pt;
+    color: #14532d;
+    font-weight: normal;
+    line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>{% if data.dataset_label and data.dataset_label != 'Dataset' %}{{ data.dataset_label }} Quality Report{% else %}Data Quality Report{% endif %}</h1>
+  <p>{{ data.app_name }} &nbsp;·&nbsp; Generated: {{ data.generated_at[:19] | replace("T", " ") }} UTC</p>
+</div>
+<div class="container">
+
+{% if data.report_type == "single" %}
+  <!-- ===== SINGLE / STANDALONE DATASET REPORT ===== -->
+
+  <!-- SECTION 1 (PAGE 1 TOP): DATA QUALITY SCORE -->
+  <div class="section">
+    <h2>Data Quality Score</h2>
+    <table width="100%" cellpadding="0" cellspacing="0" class="metric-table">
+      <tr>
+        <td width="50%" style="padding:10px 12px; background:#f8fafc; border:1px solid #e2e8f0">
+          <div class="stat-label">Before Cleaning (Initial State)</div>
+          {% set qs = data.quality_before or {} %}
+          <div style="margin-top:4px">
+            <span class="score-badge {{ (qs.score if 'score' in qs else None) | score_class }}">{{ qs.score if 'score' in qs else '—' }}/100 &mdash; {{ qs.label if 'label' in qs else 'N/A' }}</span>
+          </div>
+        </td>
+        <td width="50%" style="padding:10px 12px; background:#f8fafc; border:1px solid #e2e8f0">
+          <div class="stat-label">After Cleaning (Final State)</div>
+          {% set qs2 = data.quality_after or {} %}
+          <div style="margin-top:4px">
+            <span class="score-badge {{ (qs2.score if 'score' in qs2 else None) | score_class }}">{{ qs2.score if 'score' in qs2 else '—' }}/100 &mdash; {{ qs2.label if 'label' in qs2 else 'N/A' }}</span>
+          </div>
+          {% set delta = (qs2.score - qs.score) if ('score' in qs2 and 'score' in qs) else None %}
+          <div style="margin-top:4px">
+            {% if delta is not none and delta > 0 %}<span class="improvement">▲ +{{ delta|round(1) }} improvement</span>
+            {% elif delta is not none and delta < 0 %}<span class="decline">▼ {{ delta|round(1) }} decline</span>
+            {% else %}<span class="neutral">No change</span>{% endif %}
+          </div>
+        </td>
+      </tr>
+    </table>
+
+    {% if data.quality_after.factors %}
+    <h3>Score Breakdown (Final State)</h3>
+    <table class="data-table" width="100%" cellpadding="0" cellspacing="0">
+      <col width="28%">
+      <col width="18%">
+      <col width="54%">
+      <thead>
+        <tr>
+          <th>Factor</th>
+          <th>Penalty</th>
+          <th>Details</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for f in data.quality_after.factors %}
+        <tr>
+          <td><strong>{{ f.name | wrap_text }}</strong></td>
+          <td>{% if f.informational %}<span class="neutral">Informational</span>{% else %}-{{ f.penalty }}{% endif %}</td>
+          <td>{{ f.value | wrap_text }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </div>
+
+  <!-- SECTION 2 (PAGE 1): DATASET OVERVIEW -->
+  <div class="section">
+    <h2>Dataset Overview</h2>
+    <table width="100%" cellpadding="0" cellspacing="0" class="metric-table">
+      <tr>
+        <td width="33.33%">
+          <div class="stat-label">Source</div>
+          <div class="stat-val" style="font-size:9pt">{{ (data.source_info.get('filename') or data.source_info.get('table') or 'Dataset') | wrap_text }}</div>
+        </td>
+        <td width="33.33%">
+          <div class="stat-label">Format / Type</div>
+          <div class="stat-val">{{ data.source_info.get('type', 'CSV') | upper }}</div>
+        </td>
+        <td width="33.34%">
+          <div class="stat-label">Cleaning Status</div>
+          <div class="stat-val" style="color:#15803d; font-size:9.5pt">Cleaned &amp; Verified</div>
+        </td>
+      </tr>
+      <tr>
+        <td width="33.33%">
+          <div class="stat-label">Original Dimensions</div>
+          <div class="stat-val">{{ data.dimensions.original.rows }} <span style="font-size:8pt; font-weight:normal; color:#64748b">rows</span> &times; {{ data.dimensions.original.cols }} <span style="font-size:8pt; font-weight:normal; color:#64748b">cols</span></div>
+        </td>
+        <td width="33.33%">
+          <div class="stat-label">Final Dimensions</div>
+          <div class="stat-val">{{ data.dimensions.final.rows }} <span style="font-size:8pt; font-weight:normal; color:#64748b">rows</span> &times; {{ data.dimensions.final.cols }} <span style="font-size:8pt; font-weight:normal; color:#64748b">cols</span></div>
+        </td>
+        <td width="33.34%">
+          <div class="stat-label">Changes Applied</div>
+          <div class="stat-val">{{ data.change_history | length }} <span style="font-size:8pt; font-weight:normal; color:#64748b">action(s)</span></div>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- SECTION 3: STATISTICS (FINAL STATE) -->
+  {% set stats = data.stats or {} %}
+  <div class="section">
+    <h2>Statistics (Final State)</h2>
+
+    {% if stats.numerical and stats.numerical | length > 0 %}
+    <h3>Numerical Statistics</h3>
+    <table class="dense-table" width="100%" cellpadding="0" cellspacing="0">
+      <col width="17%">
+      <col width="8%">
+      <col width="9%">
+      <col width="9%">
+      <col width="9%">
+      <col width="8%">
+      <col width="8%">
+      <col width="8%">
+      <col width="8%">
+      <col width="16%">
+      <thead>
+        <tr>
+          <th>Column</th>
+          <th>Count</th>
+          <th>Mean</th>
+          <th>Median</th>
+          <th>Std Dev</th>
+          <th>Min</th>
+          <th>Q1 (25%)</th>
+          <th>Q3 (75%)</th>
+          <th>Max</th>
+          <th>Skewness</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for s in stats.numerical %}
+        {% if s.get('insufficient_data') %}
+        <tr>
+          <td><strong>{{ s.column | wrap_text }}</strong></td>
+          <td colspan="8" style="color:#64748b; font-style:italic">Insufficient data for reliable analysis</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td><strong>{{ s.column | wrap_text }}</strong></td>
+          <td>{{ s.count }}</td>
+          <td>{{ s.mean | fmt_val }}</td>
+          <td>{{ s.median | fmt_val }}</td>
+          <td>{{ s.std | fmt_val }}</td>
+          <td>{{ s.min | fmt_val }}</td>
+          <td>{{ s.q1 | fmt_val }}</td>
+          <td>{{ s.q3 | fmt_val }}</td>
+          <td>{{ s.max | fmt_val }}</td>
+          <td>{{ s.skewness | fmt_val }}<br/><span style="font-size:5.5pt; color:#64748b">({{ s.skewness_interpretation | wrap_text }})</span></td>
+        </tr>
+        {% endif %}
+      {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+
+    {% if stats.categorical and stats.categorical | length > 0 %}
+    <h3>Categorical Statistics</h3>
+    <table class="data-table" width="100%" cellpadding="0" cellspacing="0">
+      <col width="22%">
+      <col width="14%">
+      <col width="14%">
+      <col width="14%">
+      <col width="22%">
+      <col width="14%">
+      <thead>
+        <tr>
+          <th>Column</th>
+          <th>Non-Null</th>
+          <th>Missing</th>
+          <th>Unique</th>
+          <th>Most Common Value</th>
+          <th>Top Frequency</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for c in stats.categorical %}
+        {% if c.get('insufficient_data') %}
+        <tr>
+          <td><strong>{{ c.column | wrap_text }}</strong></td>
+          <td colspan="5" style="color:#64748b; font-style:italic">Insufficient data for reliable analysis</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td><strong>{{ c.column | wrap_text }}</strong></td>
+          <td>{{ c.count }}</td>
+          <td>{{ c.missing }}</td>
+          <td>{{ c.unique_count }}</td>
+          <td>{{ (c.most_common or '—') | wrap_text }}</td>
+          <td>{{ c.most_common_count }}</td>
+        </tr>
+        {% endif %}
+      {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+
+    {% if not stats.numerical and not stats.categorical %}
+    <p class="neutral">No statistical summaries available for this dataset.</p>
+    {% endif %}
+  </div>
+
+  <!-- SECTION 4: DATA QUALITY ISSUES -->
+  <div class="section">
+    <h2>Data Quality Issues (Final State)</h2>
+    {% if data.issues and data.issues | length > 0 %}
+    <table class="data-table" width="100%" cellpadding="0" cellspacing="0">
+      <col width="20%">
+      <col width="12%">
+      <col width="18%">
+      <col width="10%">
+      <col width="40%">
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th>Severity</th>
+          <th>Column</th>
+          <th>Count</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for issue in data.issues %}
+        <tr>
+          <td><strong>{{ issue.category | wrap_text }}</strong></td>
+          <td><span class="badge {{ issue.severity | sev_class }}">{{ issue.severity }}</span></td>
+          <td>{{ (issue.column or '—') | wrap_text }}</td>
+          <td>{{ issue.count }}</td>
+          <td>{{ issue.description | wrap_text }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="no-issues-box">
+      ✓ No outstanding data quality issues detected in the finalized dataset.
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- SECTION 5: VISUALIZATIONS -->
+  {% if data.visualizations %}
+  <div class="section">
+    <h2>Visualizations</h2>
+    <div class="chart-grid">
+      {% if data.visualizations.missing_chart %}
+      <div class="chart-card">
+        <img src="{{ data.visualizations.missing_chart }}" alt="Missing Values Chart" class="chart-img">
+      </div>
+      {% endif %}
+      {% if data.visualizations.score_chart %}
+      <div class="chart-card">
+        <img src="{{ data.visualizations.score_chart }}" alt="Score Comparison Chart" class="chart-img">
+      </div>
+      {% endif %}
+      {% if data.visualizations.distribution_chart %}
+      <div class="chart-card-full">
+        <img src="{{ data.visualizations.distribution_chart }}" alt="Distribution Chart" class="chart-img" style="max-height:240px">
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- SECTION 6: CLEANING HISTORY -->
+  {% if data.change_history %}
+  <div class="section">
+    <h2>Cleaning History</h2>
+    <table class="data-table" width="100%" cellpadding="0" cellspacing="0">
+      <col width="5%">
+      <col width="15%">
+      <col width="15%">
+      <col width="14%">
+      <col width="14%">
+      <col width="12%">
+      <col width="25%">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Action</th>
+          <th>Column</th>
+          <th>Original</th>
+          <th>New Value</th>
+          <th>Method</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for entry in data.change_history %}
+        <tr>
+          <td>{{ entry.sequence }}</td>
+          <td><span class="tag">{{ entry.action | wrap_text }}</span></td>
+          <td>{{ (entry.column or '—') | wrap_text }}</td>
+          <td>{{ (entry.original_value or '—') | wrap_text }}</td>
+          <td>{{ (entry.new_value or '—') | wrap_text }}</td>
+          <td>{{ (entry.method or '—') | wrap_text }}</td>
+          <td>{{ entry.description | wrap_text }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  <!-- SECTION 7: FINAL SUMMARY & AUDIT TAKEAWAY -->
+  {% if data.final_summary %}
+  <div class="section">
+    <h2>Final Summary &amp; Audit Takeaway</h2>
+    <div class="final-summary-box">
+      <p>{{ data.final_summary.text | wrap_text }}</p>
+    </div>
+  </div>
+  {% endif %}
+
+{% elif data.report_type == "comparison" %}
+  <!-- ===== COMPARISON REPORT ===== -->
+  {% set ref = data.reference %}
+  {% set cur = data.current %}
+  {% set comp = data.comparison %}
+  {% set s = comp.summary if comp else {} %}
+
+  <!-- SECTION 1 (PAGE 1 TOP): DATA QUALITY SCORE COMPARISON -->
+  <div class="section">
+    <h2>Data Quality Score Comparison</h2>
+    <table width="100%" cellpadding="0" cellspacing="0" class="metric-table">
+      <tr>
+        <td width="50%" style="padding:10px 12px; background:#f8fafc; border:1px solid #e2e8f0">
+          <div class="stat-label">Reference Dataset Quality</div>
+          {% set ref_b = ref.quality_before or {} %}
+          {% set ref_a = ref.quality_after or {} %}
+          <div style="margin-top:4px">
+            <span class="score-badge {{ (ref_a.score if 'score' in ref_a else None) | score_class }}">
+              Final: {{ ref_a.score if 'score' in ref_a else '—' }}/100 &mdash; {{ ref_a.label if 'label' in ref_a else 'N/A' }}
+            </span>
+          </div>
+          <div style="margin-top:4px; font-size:7.5pt; color:#64748b">
+            Initial: {{ ref_b.score if 'score' in ref_b else '—' }}/100
+            {% set ref_delta = (ref_a.score - ref_b.score) if ('score' in ref_a and 'score' in ref_b) else None %}
+            {% if ref_delta is not none and ref_delta > 0 %}<span class="improvement"> (▲ +{{ ref_delta|round(1) }})</span>
+            {% elif ref_delta is not none and ref_delta < 0 %}<span class="decline"> (▼ {{ ref_delta|round(1) }})</span>
+            {% else %}<span class="neutral"> (unchanged)</span>{% endif %}
+          </div>
+        </td>
+        <td width="50%" style="padding:10px 12px; background:#f8fafc; border:1px solid #e2e8f0">
+          <div class="stat-label">Current Dataset Quality</div>
+          {% set cur_b = cur.quality_before or {} %}
+          {% set cur_a = cur.quality_after or {} %}
+          <div style="margin-top:4px">
+            <span class="score-badge {{ (cur_a.score if 'score' in cur_a else None) | score_class }}">
+              Final: {{ cur_a.score if 'score' in cur_a else '—' }}/100 &mdash; {{ cur_a.label if 'label' in cur_a else 'N/A' }}
+            </span>
+          </div>
+          <div style="margin-top:4px; font-size:7.5pt; color:#64748b">
+            Initial: {{ cur_b.score if 'score' in cur_b else '—' }}/100
+            {% set cur_delta = (cur_a.score - cur_b.score) if ('score' in cur_a and 'score' in cur_b) else None %}
+            {% if cur_delta is not none and cur_delta > 0 %}<span class="improvement"> (▲ +{{ cur_delta|round(1) }})</span>
+            {% elif cur_delta is not none and cur_delta < 0 %}<span class="decline"> (▼ {{ cur_delta|round(1) }})</span>
+            {% else %}<span class="neutral"> (unchanged)</span>{% endif %}
+          </div>
+        </td>
+      </tr>
+    </table>
+    <div style="padding:6px 10px; background:#f0fdf4; border:1px solid #bbf7d0; font-size:7.5pt; color:#166534">
+      <strong>Cross-Dataset Quality Shift:</strong>
+      {% if s.quality_score_change is defined and s.quality_score_change > 0 %}
+        <span class="improvement" style="font-size:8pt">+{{ s.quality_score_change }} pts improvement in Current relative to Reference</span>
+      {% elif s.quality_score_change is defined and s.quality_score_change < 0 %}
+        <span class="decline" style="font-size:8pt">{{ s.quality_score_change }} pts decline in Current relative to Reference</span>
+      {% else %}
+        <span class="neutral" style="font-size:8pt">0.0 pts (identical quality score between datasets)</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- SECTION 2: COMPARISON SUMMARY & 3x3 METRICS TABLE -->
+  <div class="section">
+    <h2>Comparison Summary</h2>
+    {% if s %}
+    <!-- Executive Summary Narrative -->
+    <div style="background:#eff6ff; border:1px solid #bfdbfe; padding:8px 10px; margin-bottom:8px">
+      <div style="font-weight:bold; color:#1e40af; margin-bottom:2px; font-size:7.5pt">Executive Comparison Narrative</div>
+      <p style="color:#1e3a8a; font-size:8pt; line-height:1.45; margin:0">{{ s.narrative | wrap_text }}</p>
+      {% if s.matching_strategy_note %}
+      <div style="margin-top:4px; padding-top:4px; border-top:1px dashed #bfdbfe; font-size:7pt; color:#2563eb">
+        <strong>Matching Strategy:</strong> {{ s.matching_strategy_note | wrap_text }}
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Explicit 3x3 Metrics Table -->
+    <table width="100%" cellpadding="0" cellspacing="0" class="metric-table">
+      <tr>
+        <td width="33.33%">
+          <div class="stat-label">COLUMNS ADDED</div>
+          <div class="stat-val" style="color:#15803d">+{{ s.columns_added }}</div>
+        </td>
+        <td width="33.33%">
+          <div class="stat-label">COLUMNS REMOVED</div>
+          <div class="stat-val" style="color:#b91c1c">-{{ s.columns_removed }}</div>
+        </td>
+        <td width="33.34%">
+          <div class="stat-label">TYPE CHANGES</div>
+          <div class="stat-val">{{ s.type_changes }}</div>
+        </td>
+      </tr>
+      <tr>
+        <td width="33.33%">
+          <div class="stat-label">NEW RECORDS</div>
+          <div class="stat-val" style="color:#15803d">+{{ s.new_records }}</div>
+        </td>
+        <td width="33.33%">
+          <div class="stat-label">DELETED RECORDS</div>
+          <div class="stat-val" style="color:#b91c1c">-{{ s.deleted_records }}</div>
+        </td>
+        <td width="33.34%">
+          <div class="stat-label">MODIFIED RECORDS</div>
+          <div class="stat-val">{{ s.modified_records }}</div>
+        </td>
+      </tr>
+      <tr>
+        <td width="33.33%">
+          <div class="stat-label">QUALITY SCORE SHIFT</div>
+          <div class="stat-val" style="color:{% if s.quality_score_change > 0 %}#15803d{% elif s.quality_score_change < 0 %}#b91c1c{% else %}#64748b{% endif %}">
+            {% if s.quality_score_change > 0 %}+{% endif %}{{ s.quality_score_change }} pts
+          </div>
+        </td>
+        <td width="33.33%">
+          <div class="stat-label">NET ROW SHIFT</div>
+          <div class="stat-val">{% if s.row_count_change > 0 %}+{% endif %}{{ s.row_count_change }}</div>
+        </td>
+        <td width="33.34%">
+          <div class="stat-label">DRIFT COLUMNS</div>
+          <div class="stat-val">{{ s.drift_columns }}</div>
+        </td>
+      </tr>
+    </table>
+    {% endif %}
+  </div>
+
+  <!-- SECTION 3: SCHEMA COMPARISON -->
+  {% if comp and comp.schema %}
+  {% set sch = comp.schema %}
+  <div class="section">
+    <h2>Schema Comparison</h2>
+    <table width="100%" cellpadding="0" cellspacing="0" class="metric-table" style="margin-bottom:6px">
+      <tr>
+        <td width="33.33%">
+          <strong style="color:#15803d; font-size:7.5pt">Added Columns ({{ sch.added_columns | length }})</strong><br>
+          <div style="margin-top:3px">
+            {% for c in sch.added_columns %}<span class="tag added">+ {{ c | wrap_text }}</span> {% else %}<span class="neutral">None</span>{% endfor %}
+          </div>
+        </td>
+        <td width="33.33%">
+          <strong style="color:#b91c1c; font-size:7.5pt">Removed Columns ({{ sch.removed_columns | length }})</strong><br>
+          <div style="margin-top:3px">
+            {% for c in sch.removed_columns %}<span class="tag removed">- {{ c | wrap_text }}</span> {% else %}<span class="neutral">None</span>{% endfor %}
+          </div>
+        </td>
+        <td width="33.34%">
+          <strong style="color:#a16207; font-size:7.5pt">Type Changes ({{ sch.type_changes | length }})</strong><br>
+          <div style="margin-top:3px">
+            {% for tc in sch.type_changes %}<span class="tag changed">{{ tc.column | wrap_text }}: {{ tc.reference_type }} &rarr; {{ tc.current_type }}</span> {% else %}<span class="neutral">None</span>{% endfor %}
+          </div>
+        </td>
+      </tr>
+    </table>
+    {% if sch.possible_renames %}
+    <h3>Possible Column Renames</h3>
+    {% for pr in sch.possible_renames %}
+    <p style="color:#a16207; font-size:7.5pt; margin-top:2px">⚠ '{{ pr.reference_column | wrap_text }}' &rarr; '{{ pr.current_column | wrap_text }}' (confidence: {{ pr.confidence }}) &mdash; {{ pr.note | wrap_text }}</p>
+    {% endfor %}
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- SECTION 4: MOST FREQUENTLY CHANGED COLUMNS -->
+  {% if comp and comp.row_match and comp.row_match.frequently_changed_columns %}
+  <div class="section">
+    <h2>Most Frequently Changed Columns</h2>
+    <p style="color:#64748b; font-size:7.5pt; margin-bottom:6px">
+      Distribution of cell-level modifications across fields, showing the highest concentration of changed values.
+    </p>
+    <table class="data-table" width="100%" cellpadding="0" cellspacing="0">
+      <col width="40%">
+      <col width="30%">
+      <col width="30%">
+      <thead>
+        <tr>
+          <th>Column Name</th>
+          <th>Changed Records</th>
+          <th>% of Modified Records</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for fc in comp.row_match.frequently_changed_columns %}
+        <tr>
+          <td><strong>{{ fc.column | wrap_text }}</strong></td>
+          <td>{{ fc.change_count }}</td>
+          <td><span style="font-weight:bold; color:#1e40af">{{ fc.percent_of_modified }}%</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  <!-- SECTION 5: RECORD CHANGES -->
+  {% if comp and comp.row_match %}
+  {% set rm = comp.row_match %}
+  <div class="section">
+    <h2>Record Changes</h2>
+    <p style="color:#64748b; font-size:7.5pt; margin-bottom:6px"><strong>Matching Strategy:</strong> {{ rm.strategy | wrap_text }}</p>
+    {% if rm.modified_records %}
+    <h3>Cell-Level Modifications (showing first {{ rm.modified_records | length }} records)</h3>
+    <table class="data-table" width="100%" cellpadding="0" cellspacing="0">
+      <col width="22%">
+      <col width="22%">
+      <col width="28%">
+      <col width="28%">
+      <thead>
+        <tr>
+          <th>Record ID</th>
+          <th>Column</th>
+          <th>Reference Value</th>
+          <th>Current Value</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for rec in rm.modified_records[:100] %}
+        {% for ch in rec.changes %}
+        <tr>
+          <td><strong>{{ rec.id | wrap_text }}</strong></td>
+          <td>{{ ch.column | wrap_text }}</td>
+          <td style="color:#b91c1c; text-decoration:line-through">{{ (ch.reference_value if ch.reference_value is not none and ch.reference_value != '' else '—') | wrap_text }}</td>
+          <td>
+            <span style="color:#15803d; font-weight:bold">{{ (ch.current_value if ch.current_value is not none and ch.current_value != '' else '—') | wrap_text }}</span>
+            {% if ch.anomalous %}
+            <span class="badge sev-critical" style="margin-left:2px" title="{{ ch.anomaly_reason or 'Suspicious value' }}">⚠ ANOMALY</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- SECTION 6: DISTRIBUTION DRIFT -->
+  {% if comp and comp.drift %}
+  <div class="section">
+    <h2>Distribution Drift Analysis</h2>
+    <table class="data-table" width="100%" cellpadding="0" cellspacing="0">
+      <col width="20%">
+      <col width="12%">
+      <col width="14%">
+      <col width="14%">
+      <col width="14%">
+      <col width="26%">
+      <thead>
+        <tr>
+          <th>Column</th>
+          <th>Type</th>
+          <th>KS Statistic</th>
+          <th>p-value</th>
+          <th>Drift</th>
+          <th>Interpretation</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for d in comp.drift %}
+        <tr>
+          <td><strong>{{ d.column | wrap_text }}</strong></td>
+          <td>{{ d.type }}</td>
+          <td>{% if d.ks_available %}{{ d.ks_statistic }}{% else %}N/A{% endif %}</td>
+          <td>{% if d.ks_available %}{{ d.p_value }}{% else %}N/A{% endif %}</td>
+          <td>{% if d.drift_detected %}<span class="badge sev-high">Drift Detected</span>{% else %}<span class="badge sev-low">None</span>{% endif %}</td>
+          <td style="font-size:7pt">{{ (d.interpretation or d.note or '—') | wrap_text }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <p style="margin-top:4px; color:#64748b; font-size:7pt">⚠ Statistical significance indicates distribution variance. Review domain relevance before acting.</p>
+  </div>
+  {% endif %}
+
+{% elif data.report_type == "analysis_only" %}
+  <!-- ===== ANALYSIS ONLY DUAL DATASET REPORT ===== -->
+  <div class="section">
+    <h2>Datasets Profile Comparison</h2>
+    <table width="100%" cellpadding="0" cellspacing="0" class="metric-table">
+      <tr>
+        <td width="50%">
+          <div class="stat-label">Reference Dataset</div>
+          <div class="stat-val" style="font-size:9pt">{{ (data.reference.source_info.get('filename') or 'Reference') | wrap_text }}</div>
+          <div style="font-size:7.5pt; color:#64748b; margin-top:2px">{{ data.reference.dimensions.rows }} rows &times; {{ data.reference.dimensions.cols }} cols</div>
+          <div style="margin-top:4px">
+            <span class="score-badge {{ (data.reference.quality_score.score if data.reference.quality_score else None) | score_class }}">
+              Score: {{ data.reference.quality_score.score if data.reference.quality_score else '—' }}/100
+            </span>
+          </div>
+        </td>
+        <td width="50%">
+          <div class="stat-label">Current Dataset</div>
+          <div class="stat-val" style="font-size:9pt">{{ (data.current.source_info.get('filename') or 'Current') | wrap_text }}</div>
+          <div style="font-size:7.5pt; color:#64748b; margin-top:2px">{{ data.current.dimensions.rows }} rows &times; {{ data.current.dimensions.cols }} cols</div>
+          <div style="margin-top:4px">
+            <span class="score-badge {{ (data.current.quality_score.score if data.current.quality_score else None) | score_class }}">
+              Score: {{ data.current.quality_score.score if data.current.quality_score else '—' }}/100
+            </span>
+          </div>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  {% if data.reference.issues or data.current.issues %}
+  <div class="section">
+    <h2>Detected Issues Summary</h2>
+    <table width="100%" cellpadding="0" cellspacing="0" class="metric-table">
+      <tr>
+        <td width="50%" style="vertical-align:top">
+          <strong style="font-size:8pt">Reference Issues ({{ data.reference.issues | length }})</strong>
+          <div style="margin-top:4px">
+          {% for i in data.reference.issues %}
+            <div style="margin-bottom:3px; padding:3px 5px; background:#ffffff; border:1px solid #e2e8f0; font-size:7pt">
+              <span class="badge {{ i.severity | sev_class }}">{{ i.severity }}</span> <strong>{{ i.category | wrap_text }}</strong>: {{ i.description | wrap_text }}
+            </div>
+          {% else %}<span class="neutral">No issues</span>{% endfor %}
+          </div>
+        </td>
+        <td width="50%" style="vertical-align:top">
+          <strong style="font-size:8pt">Current Issues ({{ data.current.issues | length }})</strong>
+          <div style="margin-top:4px">
+          {% for i in data.current.issues %}
+            <div style="margin-bottom:3px; padding:3px 5px; background:#ffffff; border:1px solid #e2e8f0; font-size:7pt">
+              <span class="badge {{ i.severity | sev_class }}">{{ i.severity }}</span> <strong>{{ i.category | wrap_text }}</strong>: {{ i.description | wrap_text }}
+            </div>
+          {% else %}<span class="neutral">No issues</span>{% endfor %}
+          </div>
+        </td>
+      </tr>
+    </table>
+  </div>
+  {% endif %}
+
+{% endif %}
+
+<div style="text-align:center; color:#94a3b8; font-size:7pt; margin-top:14px; padding-bottom:12px">
+  Generated by {{ data.app_name }} &nbsp;·&nbsp; {{ data.generated_at[:10] }} &nbsp;·&nbsp; Page <pdf:pagenumber> of <pdf:pagecount>
+</div>
+</div>
+</body>
+</html>
