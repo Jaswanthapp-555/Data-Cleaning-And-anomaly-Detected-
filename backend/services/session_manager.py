@@ -1,6 +1,9 @@
-"""In-memory session manager for dataset state."""
+"""In-memory and file-backed session manager for dataset state."""
+import os
 import uuid
 import copy
+import pickle
+import tempfile
 import threading
 import pandas as pd
 from datetime import datetime, timezone
@@ -9,11 +12,43 @@ from typing import Optional
 _lock = threading.Lock()
 _sessions: dict[str, dict] = {}
 
+_DISK_CACHE_DIR = os.path.join(tempfile.gettempdir(), "cleancore_sessions")
+try:
+    os.makedirs(_DISK_CACHE_DIR, exist_ok=True)
+except OSError:
+    pass
+
+
+def _persist_session(sid: str, sess: dict):
+    if not sid or not sess:
+        return
+    try:
+        fpath = os.path.join(_DISK_CACHE_DIR, f"{sid}.pkl")
+        with open(fpath, "wb") as f:
+            pickle.dump(sess, f, protocol=pickle.HIGHEST_PROTOCOL)
+    except Exception:
+        pass
+
+
+def _restore_session(sid: str) -> Optional[dict]:
+    if not sid:
+        return None
+    try:
+        fpath = os.path.join(_DISK_CACHE_DIR, f"{sid}.pkl")
+        if os.path.exists(fpath):
+            with open(fpath, "rb") as f:
+                return pickle.load(f)
+    except Exception:
+        pass
+    return None
+
 
 def new_session() -> str:
     sid = str(uuid.uuid4())
     with _lock:
-        _sessions[sid] = _empty_session()
+        sess = _empty_session()
+        _sessions[sid] = sess
+        _persist_session(sid, sess)
     return sid
 
 
@@ -45,13 +80,21 @@ def _empty_session():
 
 
 def get_session(sid: str) -> Optional[dict]:
+    if not sid:
+        return None
     with _lock:
-        return _sessions.get(sid)
+        sess = _sessions.get(sid)
+        if sess is None:
+            sess = _restore_session(sid)
+            if sess is not None:
+                _sessions[sid] = sess
+        return sess
 
 
 def set_session(sid: str, data: dict):
     with _lock:
         _sessions[sid] = data
+        _persist_session(sid, data)
 
 
 def normalize_key(key: str) -> str:
@@ -79,12 +122,13 @@ def set_ds(sid: str, dataset_key: str, ds: dict):
     with _lock:
         if sid in _sessions:
             _sessions[sid][dataset_key] = ds
+            _persist_session(sid, _sessions[sid])
 
 
 def set_original(sid: str, dataset_key: str, df: pd.DataFrame, source_info: dict):
     dataset_key = normalize_key(dataset_key)
     with _lock:
-        sess = _sessions.get(sid)
+        sess = _sessions.get(sid) or _restore_session(sid)
         if not sess:
             return
         sess[dataset_key]["original_df"] = df.copy()
@@ -98,14 +142,17 @@ def set_original(sid: str, dataset_key: str, df: pd.DataFrame, source_info: dict
         sess[dataset_key]["resolved_outliers"] = []
         sess[dataset_key]["resolved_suspicious"] = []
         sess[dataset_key]["state"] = "uploaded"
+        _sessions[sid] = sess
+        _persist_session(sid, sess)
 
 
 def get_working_df(sid: str, dataset_key: str) -> Optional[pd.DataFrame]:
     dataset_key = normalize_key(dataset_key)
     with _lock:
-        sess = _sessions.get(sid)
+        sess = _sessions.get(sid) or _restore_session(sid)
         if not sess:
             return None
+        _sessions[sid] = sess
         w_df = sess[dataset_key].get("working_df")
         if w_df is None:
             w_df = sess[dataset_key].get("finalized_df")
@@ -115,11 +162,13 @@ def get_working_df(sid: str, dataset_key: str) -> Optional[pd.DataFrame]:
 def set_working_df(sid: str, dataset_key: str, df: pd.DataFrame):
     dataset_key = normalize_key(dataset_key)
     with _lock:
-        sess = _sessions.get(sid)
+        sess = _sessions.get(sid) or _restore_session(sid)
         if not sess:
             return
         sess[dataset_key]["working_df"] = df.copy()
         sess[dataset_key]["analysis"] = None  # Invalidate cached analysis
+        _sessions[sid] = sess
+        _persist_session(sid, sess)
 
 
 def get_original_df(sid: str, dataset_key: str) -> Optional[pd.DataFrame]:
@@ -339,19 +388,22 @@ def filter_resolved_issues(analysis: dict, resolved_outliers: list, resolved_sus
 def set_analysis(sid: str, dataset_key: str, result: dict):
     dataset_key = normalize_key(dataset_key)
     with _lock:
-        sess = _sessions.get(sid)
+        sess = _sessions.get(sid) or _restore_session(sid)
         if not sess:
             return
         sess[dataset_key]["analysis"] = result
         sess[dataset_key]["state"] = "analyzed"
+        _sessions[sid] = sess
+        _persist_session(sid, sess)
 
 
 def get_analysis(sid: str, dataset_key: str) -> Optional[dict]:
     dataset_key = normalize_key(dataset_key)
     with _lock:
-        sess = _sessions.get(sid)
+        sess = _sessions.get(sid) or _restore_session(sid)
         if not sess:
             return None
+        _sessions[sid] = sess
         raw = sess[dataset_key].get("analysis")
         if not raw:
             return None
@@ -363,46 +415,52 @@ def get_analysis(sid: str, dataset_key: str) -> Optional[dict]:
 def set_original_analysis(sid: str, dataset_key: str, result: dict):
     dataset_key = normalize_key(dataset_key)
     with _lock:
-        sess = _sessions.get(sid)
+        sess = _sessions.get(sid) or _restore_session(sid)
         if not sess:
             return
         sess[dataset_key]["original_analysis"] = copy.deepcopy(result)
+        _sessions[sid] = sess
+        _persist_session(sid, sess)
 
 
 def get_original_analysis(sid: str, dataset_key: str) -> Optional[dict]:
     dataset_key = normalize_key(dataset_key)
     with _lock:
-        sess = _sessions.get(sid)
+        sess = _sessions.get(sid) or _restore_session(sid)
         if not sess:
             return None
+        _sessions[sid] = sess
         return sess[dataset_key].get("original_analysis")
 
 
 def finalize_dataset(sid: str, dataset_key: str):
     dataset_key = normalize_key(dataset_key)
     with _lock:
-        sess = _sessions.get(sid)
+        sess = _sessions.get(sid) or _restore_session(sid)
         if not sess:
             return
         working = sess[dataset_key]["working_df"]
         if working is not None:
             sess[dataset_key]["finalized_df"] = working.copy()
             sess[dataset_key]["state"] = "finalized"
+            _sessions[sid] = sess
+            _persist_session(sid, sess)
 
 
 def get_finalized_df(sid: str, dataset_key: str) -> Optional[pd.DataFrame]:
     dataset_key = normalize_key(dataset_key)
     with _lock:
-        sess = _sessions.get(sid)
+        sess = _sessions.get(sid) or _restore_session(sid)
         if not sess:
             return None
+        _sessions[sid] = sess
         return sess[dataset_key].get("finalized_df")
 
 
 def reset_working(sid: str, dataset_key: str):
     dataset_key = normalize_key(dataset_key)
     with _lock:
-        sess = _sessions.get(sid)
+        sess = _sessions.get(sid) or _restore_session(sid)
         if not sess:
             return
         orig = sess[dataset_key]["original_df"]
@@ -419,24 +477,35 @@ def reset_working(sid: str, dataset_key: str):
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "sequence": len(sess[dataset_key]["change_history"]) + 1,
             })
+            _sessions[sid] = sess
+            _persist_session(sid, sess)
 
 
 def set_comparison(sid: str, result: dict):
     with _lock:
-        sess = _sessions.get(sid)
+        sess = _sessions.get(sid) or _restore_session(sid)
         if not sess:
             return
         sess["comparison_result"] = result
+        _sessions[sid] = sess
+        _persist_session(sid, sess)
 
 
 def get_comparison(sid: str) -> Optional[dict]:
     with _lock:
-        sess = _sessions.get(sid)
+        sess = _sessions.get(sid) or _restore_session(sid)
         if not sess:
             return None
+        _sessions[sid] = sess
         return sess.get("comparison_result")
 
 
 def delete_session(sid: str):
     with _lock:
         _sessions.pop(sid, None)
+        try:
+            fpath = os.path.join(_DISK_CACHE_DIR, f"{sid}.pkl")
+            if os.path.exists(fpath):
+                os.remove(fpath)
+        except Exception:
+            pass
