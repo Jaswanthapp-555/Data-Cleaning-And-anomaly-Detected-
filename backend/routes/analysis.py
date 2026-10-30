@@ -2,7 +2,7 @@
 from flask import Blueprint, request, jsonify
 from backend.services import session_manager as sm
 from backend.analysis import run_full_analysis
-from backend.utils.df_utils import df_to_records
+from backend.utils.df_utils import df_to_records, sanitize_for_json
 
 bp = Blueprint("analysis", __name__, url_prefix="/api")
 
@@ -33,7 +33,8 @@ def analyze():
         if sm.get_original_analysis(sid, dataset_key) is None:
             sm.set_original_analysis(sid, dataset_key, result)
         filtered = sm.get_analysis(sid, dataset_key)
-        return jsonify({"analysis": filtered if filtered is not None else result})
+        final_res = filtered if filtered is not None else result
+        return jsonify({"analysis": sanitize_for_json(final_res)})
     except Exception as e:
         import traceback, logging
         logging.getLogger(__name__).error("Failed to compute analysis:\n%s", traceback.format_exc())
@@ -58,7 +59,7 @@ def get_analysis():
                 result = sm.get_analysis(sid, dataset_key)
             else:
                 return jsonify({"error": "No dataset loaded. Please upload a dataset first."}), 404
-        return jsonify({"analysis": result})
+        return jsonify({"analysis": sanitize_for_json(result)})
     except Exception as e:
         import traceback, logging
         logging.getLogger(__name__).error("Failed to compute analysis:\n%s", traceback.format_exc())

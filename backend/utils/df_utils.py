@@ -134,17 +134,40 @@ def safe_numeric(series: pd.Series) -> pd.Series:
 
 def safe_json_val(val: Any) -> Any:
     """Convert numpy/pandas types to Python native for JSON serialisation."""
-    if val is None or (isinstance(val, float) and np.isnan(val)):
+    if val is None or (isinstance(val, (float, np.floating)) and (np.isnan(val) or np.isinf(val))):
         return None
     if isinstance(val, (np.integer,)):
         return int(val)
-    if isinstance(val, (np.floating,)):
+    if isinstance(val, (np.floating, float)):
+        if np.isnan(val) or np.isinf(val):
+            return None
         return float(val)
     if isinstance(val, (pd.Timestamp,)):
         return val.isoformat()
     if isinstance(val, (np.bool_,)):
         return bool(val)
     return val
+
+
+def sanitize_for_json(obj: Any) -> Any:
+    """Recursively sanitize an object ensuring NaN, Inf, and non-serializable types become JSON-valid null."""
+    if obj is None:
+        return None
+    if isinstance(obj, (float, np.floating)):
+        if np.isnan(obj) or np.isinf(obj):
+            return None
+        return float(obj)
+    if isinstance(obj, (int, np.integer)):
+        return int(obj)
+    if isinstance(obj, (bool, np.bool_)):
+        return bool(obj)
+    if isinstance(obj, (pd.Timestamp,)):
+        return obj.isoformat()
+    if isinstance(obj, dict):
+        return {str(k): sanitize_for_json(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple, set)):
+        return [sanitize_for_json(item) for item in obj]
+    return obj
 
 
 def is_identifier_col(series: pd.Series, col_name: str = "") -> bool:

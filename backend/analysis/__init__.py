@@ -1,5 +1,6 @@
 """Master analysis orchestrator — runs all sub-analyzers and assembles full analysis result."""
 import pandas as pd
+from backend.utils.df_utils import sanitize_for_json
 from backend.analysis.schema_analyzer import analyze_schema
 from backend.analysis.missing_analyzer import analyze_missing
 from backend.analysis.duplicate_analyzer import analyze_duplicates
@@ -89,7 +90,7 @@ def run_full_analysis(df: pd.DataFrame, kept_cells: set = None) -> dict:
         import traceback; traceback.print_exc()
         analysis["issue_center"] = []
 
-    return analysis
+    return sanitize_for_json(analysis)
 
 
 def _build_issue_center(analysis: dict) -> list:
