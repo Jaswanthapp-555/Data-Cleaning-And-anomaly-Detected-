@@ -17,7 +17,7 @@ def _require_working_df(sid, dataset_key):
 @bp.route("/analyze", methods=["POST"])
 def analyze():
     data = request.json or {}
-    sid = data.get("session_id")
+    sid = data.get("session_id") or request.headers.get("X-Session-Id") or request.args.get("session_id")
     dataset_key = data.get("dataset", "single")
     if not sid:
         return jsonify({"error": "session_id required."}), 400
@@ -44,7 +44,7 @@ def analyze():
 
 @bp.route("/analysis/result", methods=["GET"])
 def get_analysis():
-    sid = request.args.get("session_id")
+    sid = request.args.get("session_id") or request.headers.get("X-Session-Id")
     dataset_key = request.args.get("dataset", "single")
     if not sid:
         return jsonify({"error": "session_id required."}), 400
@@ -192,13 +192,20 @@ def affected_rows():
 
 @bp.route("/dataset/state", methods=["GET"])
 def dataset_state():
-    sid = request.args.get("session_id")
+    sid = request.args.get("session_id") or request.headers.get("X-Session-Id")
     dataset_key = request.args.get("dataset", "single")
     if not sid:
         return jsonify({"error": "session_id required."}), 400
     sess = sm.get_session(sid)
     if not sess:
-        return jsonify({"error": "Session not found."}), 404
+        return jsonify({
+            "state": "empty",
+            "source_info": {},
+            "current_info": {},
+            "has_analysis": False,
+            "change_count": 0,
+            "mode": None,
+        })
     ds = sess.get(dataset_key, {})
     
     # Calculate current info from working_df if available
@@ -214,8 +221,12 @@ def dataset_state():
             "sheet": source_info.get("sheet")
         }
         
+    st = ds.get("state", "empty")
+    if ds.get("working_df") is not None and st == "empty":
+        st = "uploaded"
+
     return jsonify({
-        "state": ds.get("state", "empty"),
+        "state": st,
         "source_info": ds.get("source_info", {}),
         "current_info": current_info,
         "has_analysis": ds.get("analysis") is not None,

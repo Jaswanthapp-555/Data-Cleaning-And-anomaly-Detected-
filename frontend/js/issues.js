@@ -16,7 +16,12 @@ export async function renderIssues(container, dataset) {
 
   container.innerHTML = `<div class="loading-overlay" style="min-height:200px"><div class="spinner spinner-lg"></div><div class="loading-text">Loading issues...</div></div>`;
   try {
-    const res = await api.getAnalysis(dataset);
+    let res;
+    try {
+      res = await api.getAnalysis(dataset);
+    } catch {
+      res = await api.analyze(dataset);
+    }
     renderIssueCenter(container, res.analysis, dataset);
   } catch (e) {
     container.innerHTML = `<div class="alert alert-error">✗ ${escHtml(e.message)}</div>`;

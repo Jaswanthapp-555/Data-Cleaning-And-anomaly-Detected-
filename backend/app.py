@@ -3,6 +3,19 @@ import os
 from flask import Flask, send_from_directory
 from flask_cors import CORS
 from .routes import upload, analysis, cleaning, visualization, comparison, reports
+from .utils.df_utils import sanitize_for_json
+
+try:
+    from flask.json.provider import DefaultJSONProvider
+
+    class SafeJSONProvider(DefaultJSONProvider):
+        """JSON provider ensuring all outputs comply with RFC 8259 (no NaN, Infinity, or -Infinity)."""
+        def dumps(self, obj, **kwargs):
+            return super().dumps(sanitize_for_json(obj), **kwargs)
+
+    JSON_PROVIDER_CLASS = SafeJSONProvider
+except Exception:
+    JSON_PROVIDER_CLASS = None
 
 
 def create_app():
@@ -11,6 +24,8 @@ def create_app():
         static_folder=os.path.join(os.path.dirname(__file__), "..", "frontend"),
         static_url_path="/static",
     )
+    if JSON_PROVIDER_CLASS is not None:
+        app.json = JSON_PROVIDER_CLASS(app)
     app.config["MAX_CONTENT_LENGTH"] = 100 * 1024 * 1024  # 100 MB
     app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", os.urandom(24).hex())
     upload_folder = "/tmp/uploads" if os.environ.get("VERCEL") else os.path.join(os.path.dirname(__file__), "..", "uploads")

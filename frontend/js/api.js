@@ -2,7 +2,12 @@
 const API_BASE = "";
 
 export async function apiFetch(path, options = {}) {
-  const sid = window._sessionId;
+  let sid = window._sessionId;
+  if (!sid) {
+    try { sid = localStorage.getItem("cleancore_session_id"); } catch {}
+    if (sid) window._sessionId = sid;
+  }
+
   const defaultHeaders = { "Content-Type": "application/json" };
   if (sid) defaultHeaders["X-Session-Id"] = sid;
 
@@ -25,8 +30,14 @@ export async function apiFetch(path, options = {}) {
     delete opts.headers["Content-Type"];
   }
 
+  // Ensure session_id is also safely present in query params for mobile WebView / TWA reliability
+  let url = API_BASE + path;
+  if (sid && !url.includes("session_id=")) {
+    url += (url.includes("?") ? "&" : "?") + `session_id=${encodeURIComponent(sid)}`;
+  }
+
   try {
-    const res = await fetch(API_BASE + path, opts);
+    const res = await fetch(url, opts);
     clearTimeout(timer);
     if (!res.ok) {
       let errMsg = `HTTP ${res.status}`;
@@ -37,7 +48,14 @@ export async function apiFetch(path, options = {}) {
       throw new Error(errMsg);
     }
     const ct = res.headers.get("content-type") || "";
-    if (ct.includes("application/json")) return res.json();
+    if (ct.includes("application/json")) {
+      const data = await res.json();
+      if (data && data.session_id) {
+        window._sessionId = data.session_id;
+        try { localStorage.setItem("cleancore_session_id", data.session_id); } catch {}
+      }
+      return data;
+    }
     if (ct.includes("text/html") || ct.includes("text/csv")) return res.text();
     return res.blob();
   } catch (err) {
@@ -50,13 +68,24 @@ export async function apiFetch(path, options = {}) {
 }
 
 export async function newSession() {
-  return apiFetch("/api/session/new", { method: "POST" });
+  const res = await apiFetch("/api/session/new", { method: "POST" });
+  if (res && res.session_id) {
+    window._sessionId = res.session_id;
+    try { localStorage.setItem("cleancore_session_id", res.session_id); } catch {}
+  }
+  return res;
 }
 
 export async function uploadFile(file, dataset = "single") {
+  let sid = window._sessionId;
+  if (!sid) {
+    try { sid = localStorage.getItem("cleancore_session_id"); } catch {}
+    if (sid) window._sessionId = sid;
+  }
   const fd = new FormData();
   fd.append("file", file);
   fd.append("dataset", dataset);
+  if (sid) fd.append("session_id", sid);
   return apiFetch("/api/upload/file", { method: "POST", body: fd });
 }
 

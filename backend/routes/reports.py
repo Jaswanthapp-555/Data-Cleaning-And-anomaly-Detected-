@@ -13,7 +13,7 @@ bp = Blueprint("reports", __name__, url_prefix="/api")
 @bp.route("/report/html", methods=["POST"])
 def html_report():
     data = request.json or {}
-    sid = data.get("session_id")
+    sid = data.get("session_id") or request.headers.get("X-Session-Id") or request.args.get("session_id")
     mode = data.get("mode", "single")
     report_type = data.get("report_type", "analysis")  # analysis | comparison
     if not sid: return jsonify({"error": "session_id required."}), 400
@@ -32,7 +32,7 @@ def html_report():
 @bp.route("/report/pdf", methods=["POST"])
 def pdf_report():
     data = request.json or {}
-    sid = data.get("session_id")
+    sid = data.get("session_id") or request.headers.get("X-Session-Id") or request.args.get("session_id")
     mode = data.get("mode", "single")
     report_type = data.get("report_type", "analysis")
     if not sid: return jsonify({"error": "session_id required."}), 400
@@ -61,7 +61,7 @@ def pdf_report():
 
 @bp.route("/download/dataset", methods=["GET"])
 def download_dataset():
-    sid = request.args.get("session_id")
+    sid = request.args.get("session_id") or request.headers.get("X-Session-Id")
     dk = request.args.get("dataset", "single")
     if not sid: return jsonify({"error": "session_id required."}), 400
 
@@ -83,7 +83,7 @@ def download_dataset():
 
 @bp.route("/download/missing-log", methods=["GET"])
 def download_missing_log():
-    sid = request.args.get("session_id")
+    sid = request.args.get("session_id") or request.headers.get("X-Session-Id")
     dk = request.args.get("dataset", "single")
     if not sid: return jsonify({"error": "session_id required."}), 400
 

@@ -134,17 +134,28 @@ def safe_numeric(series: pd.Series) -> pd.Series:
 
 def safe_json_val(val: Any) -> Any:
     """Convert numpy/pandas types to Python native for JSON serialisation."""
-    if val is None or (isinstance(val, (float, np.floating)) and (np.isnan(val) or np.isinf(val))):
+    if val is None:
         return None
-    if isinstance(val, (np.integer,)):
+    try:
+        if pd.isna(val):
+            return None
+    except Exception:
+        pass
+    try:
+        import math
+        if isinstance(val, (float, np.floating)):
+            if math.isnan(val) or math.isinf(val):
+                return None
+            return float(val)
+    except Exception:
+        pass
+    if isinstance(val, (np.integer, int)):
         return int(val)
     if isinstance(val, (np.floating, float)):
-        if np.isnan(val) or np.isinf(val):
-            return None
         return float(val)
     if isinstance(val, (pd.Timestamp,)):
         return val.isoformat()
-    if isinstance(val, (np.bool_,)):
+    if isinstance(val, (np.bool_, bool)):
         return bool(val)
     return val
 
@@ -153,16 +164,35 @@ def sanitize_for_json(obj: Any) -> Any:
     """Recursively sanitize an object ensuring NaN, Inf, and non-serializable types become JSON-valid null."""
     if obj is None:
         return None
-    if isinstance(obj, (float, np.floating)):
-        if np.isnan(obj) or np.isinf(obj):
+    try:
+        if pd.isna(obj) and not isinstance(obj, (list, tuple, dict, set, pd.DataFrame, pd.Series)):
             return None
-        return float(obj)
+    except Exception:
+        pass
+    try:
+        import math
+        if isinstance(obj, (float, np.floating)):
+            if math.isnan(obj) or math.isinf(obj):
+                return None
+            return float(obj)
+    except Exception:
+        pass
     if isinstance(obj, (int, np.integer)):
         return int(obj)
     if isinstance(obj, (bool, np.bool_)):
         return bool(obj)
     if isinstance(obj, (pd.Timestamp,)):
         return obj.isoformat()
+    try:
+        from datetime import datetime, date
+        if isinstance(obj, (datetime, date)):
+            return obj.isoformat()
+    except Exception:
+        pass
+    if isinstance(obj, pd.Series):
+        return [sanitize_for_json(x) for x in obj.tolist()]
+    if isinstance(obj, np.ndarray):
+        return [sanitize_for_json(x) for x in obj.tolist()]
     if isinstance(obj, dict):
         return {str(k): sanitize_for_json(v) for k, v in obj.items()}
     if isinstance(obj, (list, tuple, set)):

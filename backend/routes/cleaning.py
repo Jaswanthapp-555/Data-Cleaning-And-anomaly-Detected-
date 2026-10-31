@@ -13,6 +13,10 @@ bp = Blueprint("cleaning", __name__, url_prefix="/api/clean")
 
 
 def _require(data, *keys):
+    if "session_id" in keys and "session_id" not in data:
+        header_sid = request.headers.get("X-Session-Id") or request.args.get("session_id")
+        if header_sid:
+            data["session_id"] = header_sid
     for k in keys:
         if k not in data:
             return jsonify({"error": f"Missing required field: {k}"}), 400

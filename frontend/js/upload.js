@@ -285,14 +285,24 @@ async function processFile(file, container, dataset) {
     }
 
     if (res.file_type === "excel") {
-      // Excel workbook with sheet list
+      // Excel workbook with sheet list (auto-loaded sheet 1)
       container.querySelector("#excel-filename-label").textContent = res.filename;
       container.querySelector("#excel-filesize-label").textContent = `Excel Workbook (${res.size_mb || '<1'} MB)`;
       const sheetSel = container.querySelector("#excel-sheet-select");
-      sheetSel.innerHTML = (res.sheets || []).map(s => `<option value="${escHtml(s)}">${escHtml(s)}</option>`).join("");
-      container.querySelector("#excel-sheet-card").classList.remove("hidden");
-      container.querySelector("#dataset-ready-section").classList.add("hidden");
-      alertBox.innerHTML = `<div class="alert alert-success">✓ Excel file uploaded. Select a worksheet to load.</div>`;
+      if (sheetSel && res.sheets) {
+        sheetSel.innerHTML = res.sheets.map(s => `<option value="${escHtml(s)}"${s === res.selected_sheet ? ' selected' : ''}>${escHtml(s)}</option>`).join("");
+      }
+
+      // If workbook has multiple sheets, keep the sheet switcher accessible
+      if (res.sheets && res.sheets.length > 1) {
+        container.querySelector("#excel-sheet-card").classList.remove("hidden");
+      } else {
+        container.querySelector("#excel-sheet-card").classList.add("hidden");
+      }
+
+      state.datasetStates[dataset] = "uploaded";
+      showDatasetReady(container, res, dataset);
+      alertBox.innerHTML = `<div class="alert alert-success">✓ Excel file uploaded and worksheet '${escHtml(res.selected_sheet || res.sheets[0] || "")}' loaded successfully.</div>`;
     } else {
       // CSV file loaded
       state.datasetStates[dataset] = "uploaded";

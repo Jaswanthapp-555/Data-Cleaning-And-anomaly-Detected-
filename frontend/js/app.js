@@ -29,9 +29,37 @@ const ICONS = {
 export async function initApp() {
   initThemeSwitcher();
   init3DTilt();
-  const res = await api.newSession();
-  state.sessionId = res.session_id;
-  window._sessionId = res.session_id;
+
+  let savedSid = null;
+  try { savedSid = localStorage.getItem("cleancore_session_id"); } catch {}
+  let validSession = false;
+
+  if (savedSid) {
+    window._sessionId = savedSid;
+    state.sessionId = savedSid;
+    try {
+      const st = await api.getDatasetState("single");
+      if (st && st.state && st.state !== "error") {
+        validSession = true;
+      }
+    } catch {
+      validSession = false;
+    }
+  }
+
+  if (!validSession) {
+    try {
+      const res = await api.newSession();
+      if (res && res.session_id) {
+        state.sessionId = res.session_id;
+        window._sessionId = res.session_id;
+        try { localStorage.setItem("cleancore_session_id", res.session_id); } catch {}
+      }
+    } catch (e) {
+      console.warn("Failed to create new session:", e);
+    }
+  }
+
   renderSidebar();
   navigate("home");
 }

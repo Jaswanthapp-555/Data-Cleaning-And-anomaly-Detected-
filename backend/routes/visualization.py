@@ -10,7 +10,7 @@ bp = Blueprint("visualization", __name__, url_prefix="/api/viz")
 
 @bp.route("/available", methods=["GET"])
 def available_charts():
-    sid = request.args.get("session_id")
+    sid = request.args.get("session_id") or request.headers.get("X-Session-Id")
     dk = request.args.get("dataset", "single")
     if not sid: return jsonify({"error": "session_id required."}), 400
     df = sm.get_working_df(sid, dk)
@@ -21,7 +21,7 @@ def available_charts():
 @bp.route("/overview", methods=["GET"])
 @bp.route("/dataset-overview", methods=["GET"])
 def dataset_overview():
-    sid = request.args.get("session_id")
+    sid = request.args.get("session_id") or request.headers.get("X-Session-Id")
     dk = request.args.get("dataset", "single")
     which = request.args.get("which", "working")
     if not sid: return jsonify({"error": "session_id required."}), 400
@@ -50,7 +50,7 @@ def dataset_overview():
 @bp.route("/generate", methods=["POST"])
 def generate():
     data = request.json or {}
-    sid = data.get("session_id")
+    sid = data.get("session_id") or request.headers.get("X-Session-Id") or request.args.get("session_id")
     dk = data.get("dataset", "single")
     chart_type = data.get("chart_type")
     config = data.get("config", {})

@@ -80,12 +80,32 @@ def upload_file():
                 "preview": _preview(df),
             })
         else:
-            # Excel file — return sheet list
+            # Excel file — read sheet list and auto-load the first sheet immediately
             sheets = read_excel_sheets(file_bytes)
             if not sheets:
                 return jsonify({"error": "No worksheets found in this Excel file."}), 400
 
-            # Save excel bytes into session for subsequent sheet loading
+            first_sheet = sheets[0]
+            df = read_excel_sheet(file_bytes, first_sheet)
+            if len(df) == 0:
+                return jsonify({"error": f"Worksheet '{first_sheet}' contains no data rows."}), 400
+
+            source_info = {
+                "type": "excel",
+                "filename": filename,
+                "sheet": first_sheet,
+                "size_mb": size_mb,
+                "rows": len(df),
+                "cols": len(df.columns),
+            }
+            sm.set_original(sid, dataset_key, df, source_info)
+
+            from backend.analysis import run_full_analysis
+            analysis_res = run_full_analysis(df)
+            sm.set_analysis(sid, dataset_key, analysis_res)
+            sm.set_original_analysis(sid, dataset_key, analysis_res)
+
+            # Save excel bytes into session for subsequent sheet switching if workbook has multiple sheets
             sess = sm.get_session(sid)
             if not sess:
                 sess = sm.get_session(sid) or {}
@@ -110,6 +130,12 @@ def upload_file():
                 "filename": filename,
                 "size_mb": size_mb,
                 "sheets": sheets,
+                "selected_sheet": first_sheet,
+                "source_info": source_info,
+                "columns": list(df.columns),
+                "dtypes": {c: str(df[c].dtype) for c in df.columns},
+                "analysis": analysis_res,
+                "preview": _preview(df),
             })
 
     except Exception as e:
@@ -136,7 +162,7 @@ def load_excel_sheet():
         file_bytes = sess[bytes_key]
     else:
         # Fallback to disk-cached Excel file
-        import tempfile
+        import tempfile, glob
         disk_path = os.path.join(tempfile.gettempdir(), f"cleancore_excel_{sid}_{dataset_key}.xlsx")
         if os.path.exists(disk_path):
             try:
@@ -144,6 +170,17 @@ def load_excel_sheet():
                     file_bytes = f.read()
             except Exception:
                 pass
+
+        if not file_bytes:
+            # Fallback to most recent excel cache in temp dir
+            pattern = os.path.join(tempfile.gettempdir(), f"cleancore_excel_*_{dataset_key}.xlsx")
+            matches = sorted(glob.glob(pattern), key=os.path.getmtime, reverse=True)
+            if matches:
+                try:
+                    with open(matches[0], "rb") as f:
+                        file_bytes = f.read()
+                except Exception:
+                    pass
 
     if not file_bytes:
         return jsonify({"error": "Excel file data not found in session. Please re-upload the file."}), 400
