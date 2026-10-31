@@ -3,7 +3,7 @@ services:
     name: clean-core-profiler
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn "backend.app:create_app()" --timeout 120 --workers 2
+    startCommand: gunicorn "backend.app:create_app()" --timeout 120 --workers 1 --threads 8
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9

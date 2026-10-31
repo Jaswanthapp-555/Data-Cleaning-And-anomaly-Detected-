@@ -87,10 +87,21 @@ def upload_file():
 
             # Save excel bytes into session for subsequent sheet loading
             sess = sm.get_session(sid)
+            if not sess:
+                sess = sm.get_session(sid) or {}
             sess[f"_excel_bytes_{dataset_key}"] = file_bytes
             sess[f"_excel_filename_{dataset_key}"] = filename
             sess[f"_excel_sizemb_{dataset_key}"] = size_mb
             sm.set_session(sid, sess)
+
+            # Also persist raw file to disk as a reliable backup
+            try:
+                import tempfile
+                disk_path = os.path.join(tempfile.gettempdir(), f"cleancore_excel_{sid}_{dataset_key}.xlsx")
+                with open(disk_path, "wb") as f:
+                    f.write(file_bytes)
+            except Exception:
+                pass
 
             return jsonify({
                 "session_id": sid,
@@ -119,8 +130,26 @@ def load_excel_sheet():
 
     sess = sm.get_session(sid)
     bytes_key = f"_excel_bytes_{dataset_key}"
-    if not sess or bytes_key not in sess:
+
+    file_bytes = None
+    if sess and bytes_key in sess:
+        file_bytes = sess[bytes_key]
+    else:
+        # Fallback to disk-cached Excel file
+        import tempfile
+        disk_path = os.path.join(tempfile.gettempdir(), f"cleancore_excel_{sid}_{dataset_key}.xlsx")
+        if os.path.exists(disk_path):
+            try:
+                with open(disk_path, "rb") as f:
+                    file_bytes = f.read()
+            except Exception:
+                pass
+
+    if not file_bytes:
         return jsonify({"error": "Excel file data not found in session. Please re-upload the file."}), 400
+
+    if not sess:
+        sess = sm.get_session(sid) or {}
 
     try:
         file_bytes = sess[bytes_key]

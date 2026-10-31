@@ -256,6 +256,7 @@ function wireDropzone(container, dataset) {
         const res = await api.loadExcelSheet(sheet, dataset);
         state.datasetStates[dataset] = "uploaded";
         showDatasetReady(container, res, dataset);
+        updateTopbar();
         alertBox.innerHTML = `<div class="alert alert-success">✓ Loaded worksheet '${escHtml(sheet)}' successfully.</div>`;
       } catch (e) {
         alertBox.innerHTML = `<div class="alert alert-error">✗ Unable to load sheet: ${escHtml(e.message)}</div>`;

@@ -5,6 +5,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Automated Data Quality &amp; Anomaly Profiler</title>
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#3b5bfd">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="stylesheet" href="/static/css/main.css?v=2">
   <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
   <script>
@@ -103,6 +107,9 @@
     import { initApp } from "/static/js/app.js";
     document.addEventListener("DOMContentLoaded", () => {
       initApp();
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("/static/sw.js").catch(() => {});
+      }
     });
   </script>
 </body>
