@@ -1,6 +1,6 @@
 /* issues.js — Data Quality Issue Center */
 import * as api from "./api.js";
-import { navigate, severityBadge, showModal, escHtml, renderNoDatasetState } from "./app.js";
+import { navigate, severityBadge, showModal, escHtml, renderNoDatasetState, showAlert, updateTopbar } from "./app.js";
 
 export async function renderIssues(container, dataset) {
   try {
@@ -172,6 +172,13 @@ function renderIssueList(issues) {
           <button class="btn btn-primary btn-sm btn-action" data-hint="resolve_suspicious" data-col="${escHtml(i.column || '')}">
             Resolve in Modal →
           </button>
+        ` : i.category === "Duplicate Rows" ? `
+          <button class="btn btn-warning btn-sm btn-quick-rem-dups" title="Remove all exact duplicate rows">
+            🗑️ Remove Exact Duplicates
+          </button>
+          <button class="btn btn-primary btn-sm btn-action" data-hint="remove_duplicates">
+            Apply Action →
+          </button>
         ` : i.category === "Data-Type Issues" ? `
           <button class="btn btn-primary btn-sm btn-action" data-hint="repair_type" data-col="${escHtml(i.column || '')}" data-target="${escHtml(i.recommended_type || '')}">
             Apply Action →
@@ -241,8 +248,31 @@ function wireIssueButtons(container, dataset, currentIssues) {
         onConfirm: async () => {
           try {
             await api.deleteRows(dataset, issue.affected_indices);
+            await updateTopbar(dataset);
             showAlert(`✓ Deleted ${count} row(s) containing suspicious values.`, "success");
-            renderIssues(container, dataset);
+            await renderIssues(container, dataset);
+          } catch (e) {
+            showAlert(e.message, "error");
+          }
+        }
+      });
+    };
+  });
+
+  // Quick action: Remove Exact Duplicates directly from Issue Center
+  container.querySelectorAll(".btn-quick-rem-dups").forEach(btn => {
+    btn.onclick = () => {
+      showModal({
+        title: "Remove Exact Duplicates",
+        body: `<p>Identify and remove exact complete-row duplicate records. Only rows where <em>every</em> cell is identical will be removed.</p>`,
+        confirmText: "Remove Duplicates",
+        confirmClass: "btn-warning",
+        onConfirm: async () => {
+          try {
+            const res = await api.removeDuplicates(dataset);
+            await updateTopbar(dataset);
+            showAlert(`✓ ${res.entry.description}`, "success");
+            await renderIssues(container, dataset);
           } catch (e) {
             showAlert(e.message, "error");
           }

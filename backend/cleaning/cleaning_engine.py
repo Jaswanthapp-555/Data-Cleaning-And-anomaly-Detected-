@@ -67,7 +67,7 @@ def resolve_outlier(df: pd.DataFrame, row_index: int, column: str, resolution: s
         return df, entries
         
     elif resolution == "delete_row":
-        df = df.drop(index=[row_index])
+        df = df.drop(index=[row_index]).reset_index(drop=True)
         entries.append({
             "action": "DELETE_ROWS",
             "method": "Outlier removal",
@@ -138,7 +138,7 @@ def delete_rows(df: pd.DataFrame, row_indices: list) -> tuple[pd.DataFrame, dict
     existing = [i for i in row_indices if i in df.index]
     if not existing:
         raise ValueError("None of the specified row indices exist.")
-    df = df.drop(index=existing)
+    df = df.drop(index=existing).reset_index(drop=True)
     return df, {
         "action": "DELETE_ROWS",
         "description": f"Deleted {len(existing)} row(s): {existing[:10]}{'...' if len(existing) > 10 else ''}",
@@ -245,7 +245,7 @@ def fill_missing(df: pd.DataFrame, column: str, method: str, manual_value=None) 
 def remove_duplicates(df: pd.DataFrame, keep: str = "first") -> tuple[pd.DataFrame, dict]:
     """Remove exact duplicate rows, keeping first occurrence."""
     before = len(df)
-    df = df.drop_duplicates(keep=keep)
+    df = df.drop_duplicates(keep=keep).reset_index(drop=True)
     after = len(df)
     removed = before - after
     return df, {
@@ -343,7 +343,7 @@ def resolve_suspicious_value(df: pd.DataFrame, row_index: int, column: str, reso
     entries = []
 
     if resolution == "delete_row":
-        df = df.drop(index=[row_index])
+        df = df.drop(index=[row_index]).reset_index(drop=True)
         entries.append({
             "action": "DELETE_ROWS",
             "method": "Suspicious value removal",
@@ -416,7 +416,7 @@ def delete_column_missing_rows(df: pd.DataFrame, column: str) -> tuple[pd.DataFr
     if not missing_indices:
         raise ValueError(f"No missing values found in column '{column}'.")
 
-    df = df.drop(index=missing_indices)
+    df = df.drop(index=missing_indices).reset_index(drop=True)
     return df, {
         "action": "DELETE_ROWS_BY_COLUMN",
         "description": f"Deleted {len(missing_indices)} row(s) where column '{column}' was missing.",

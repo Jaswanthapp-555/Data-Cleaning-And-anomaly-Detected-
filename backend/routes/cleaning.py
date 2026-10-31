@@ -176,8 +176,13 @@ def fill_missing():
     df = sm.get_working_df(sid, dk)
     if df is None: return jsonify({"error": "Dataset not found."}), 404
     try:
-        new_df, entry = ce.fill_missing(df, data["column"], data["method"],
+        method = data["method"]
+        mask = get_missing_mask(df[data["column"]])
+        missing_indices = [int(i) for i in df[mask].index.tolist()]
+        new_df, entry = ce.fill_missing(df, data["column"], method,
                                          manual_value=data.get("manual_value"))
+        if method == "delete_row" and missing_indices:
+            sm.adjust_resolved_indices(sid, dk, missing_indices)
         analysis = _update_and_reanalyze(sid, dk, new_df, entry)
         return jsonify({"success": True, "entry": entry, "analysis": analysis})
     except Exception as e:
@@ -193,7 +198,11 @@ def remove_duplicates():
     df = sm.get_working_df(sid, dk)
     if df is None: return jsonify({"error": "Dataset not found."}), 404
     try:
+        dup_mask = df.duplicated(keep=data.get("keep", "first"))
+        dup_indices = [int(i) for i in df[dup_mask].index.tolist()]
         new_df, entry = ce.remove_duplicates(df, keep=data.get("keep", "first"))
+        if dup_indices:
+            sm.adjust_resolved_indices(sid, dk, dup_indices)
         analysis = _update_and_reanalyze(sid, dk, new_df, entry)
         return jsonify({"success": True, "entry": entry, "new_row_count": len(new_df), "analysis": analysis})
     except Exception as e:
@@ -305,7 +314,7 @@ def resolve_outlier():
                     })
                     deleted_rows.append(r)
             if deleted_rows:
-                new_df = new_df.drop(index=deleted_rows)
+                new_df = new_df.drop(index=deleted_rows).reset_index(drop=True)
                 sm.adjust_resolved_indices(sid, dk, sorted(deleted_rows))
 
         elif resolution in ("keep", "leave_unchanged"):
@@ -473,10 +482,8 @@ def resolve_suspicious():
                     })
                     deleted_rows.append(r)
             if deleted_rows:
-                new_df = new_df.drop(index=deleted_rows)
+                new_df = new_df.drop(index=deleted_rows).reset_index(drop=True)
                 sm.adjust_resolved_indices(sid, dk, sorted(deleted_rows))
-            for r in row_indices:
-                sm.add_resolved_suspicious(sid, dk, col_name, r, None)
 
         elif resolution in ("keep", "leave_unchanged"):
             for r in row_indices:
@@ -764,7 +771,7 @@ def resolve_type_rows():
                             "row_index": r,
                             "original_value": str(orig) if orig is not None else "",
                         })
-                    new_df = new_df.drop(index=deleted_rows)
+                    new_df = new_df.drop(index=deleted_rows).reset_index(drop=True)
                     sm.adjust_resolved_indices(sid, dk, sorted(deleted_rows))
 
                     target = data.get("target_type")

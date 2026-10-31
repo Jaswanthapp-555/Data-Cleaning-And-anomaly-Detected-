@@ -151,10 +151,13 @@ def load_excel_sheet():
     if not sess:
         sess = sm.get_session(sid) or {}
 
+    if bytes_key not in sess:
+        sess[bytes_key] = file_bytes
+        sm.set_session(sid, sess)
+
     try:
-        file_bytes = sess[bytes_key]
         filename = sess.get(f"_excel_filename_{dataset_key}", "workbook.xlsx")
-        size_mb = sess.get(f"_excel_sizemb_{dataset_key}", 0)
+        size_mb = sess.get(f"_excel_sizemb_{dataset_key}", round(len(file_bytes) / (1024 * 1024), 2))
 
         df = read_excel_sheet(file_bytes, sheet)
         if len(df) == 0:

@@ -284,6 +284,16 @@ def adjust_resolved_indices(sid: str, dataset_key: str, deleted_indices: list):
                 updated.append(item_copy)
             sess[dataset_key][key] = updated
 
+        if "kept_cells" in sess[dataset_key]:
+            new_kept = set()
+            for r, col in sess[dataset_key]["kept_cells"]:
+                if r in del_set:
+                    continue
+                shift = sum(1 for d in deleted_indices if d < r)
+                new_kept.add((r - shift, col))
+            sess[dataset_key]["kept_cells"] = new_kept
+        _persist_session(sid, sess)
+
 
 def filter_resolved_issues(analysis: dict, resolved_outliers: list, resolved_suspicious: list) -> dict:
     """Filter out resolved outliers and suspicious values so resolved columns drop out of dropdowns."""
@@ -291,15 +301,21 @@ def filter_resolved_issues(analysis: dict, resolved_outliers: list, resolved_sus
         return analysis
 
     filtered = copy.deepcopy(analysis)
+    resolved_out_map = {}
+    resolved_susp_map = {}
+
+    for r in (resolved_outliers or []):
+        col = r.get("column")
+        if col:
+            resolved_out_map.setdefault(col, set()).add(r.get("row_index"))
+
+    for r in (resolved_suspicious or []):
+        col = r.get("column")
+        if col:
+            resolved_susp_map.setdefault(col, set()).add(r.get("row_index"))
 
     # 1. Filter outliers
     if "outliers" in filtered and "outlier_details" in filtered["outliers"]:
-        resolved_out_map = {}
-        for r in resolved_outliers:
-            col = r.get("column")
-            if col:
-                resolved_out_map.setdefault(col, set()).add(r.get("row_index"))
-
         new_outlier_details = []
         for item in filtered["outliers"]["outlier_details"]:
             col = item.get("column")
@@ -322,12 +338,6 @@ def filter_resolved_issues(analysis: dict, resolved_outliers: list, resolved_sus
 
     # 2. Filter suspicious
     if "suspicious" in filtered and "suspicious_issues" in filtered["suspicious"]:
-        resolved_susp_map = {}
-        for r in resolved_suspicious:
-            col = r.get("column")
-            if col:
-                resolved_susp_map.setdefault(col, set()).add(r.get("row_index"))
-
         new_susp_issues = []
         for iss in filtered["suspicious"]["suspicious_issues"]:
             col = iss.get("column")
@@ -364,7 +374,15 @@ def filter_resolved_issues(analysis: dict, resolved_outliers: list, resolved_sus
                 continue
             if ("Suspicious" in cat or "Invalid" in cat or "Inconsisten" in cat) and col and col not in active_susp_cols:
                 continue
-            # Keep remaining affected indices in sync
+            # Keep remaining affected indices in sync for Outliers
+            if "Outlier" in cat and col in resolved_out_map:
+                resolved_rows = resolved_out_map.get(col, set())
+                rem_idx = [idx for idx in issue.get("affected_indices", []) if idx not in resolved_rows]
+                issue["affected_indices"] = rem_idx
+                issue["count"] = len(rem_idx)
+                if "row_details" in issue:
+                    issue["row_details"] = [d for d in issue["row_details"] if d.get("row") not in resolved_rows]
+            # Keep remaining affected indices in sync for Suspicious
             if ("Suspicious" in cat or "Invalid" in cat or "Inconsisten" in cat) and col in resolved_susp_map:
                 resolved_rows = resolved_susp_map.get(col, set())
                 rem_idx = [idx for idx in issue.get("affected_indices", []) if idx not in resolved_rows]

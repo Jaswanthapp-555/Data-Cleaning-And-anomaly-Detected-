@@ -147,7 +147,7 @@ export async function renderCleaning(container, dataset, opts = {}) {
       showFillMissingModal(dataset, opts.column, container);
     } else if (opts.hint === "delete_column_missing") {
       showDeleteColumnMissingModal(dataset, container, opts.column);
-    } else if (opts.hint === "duplicates") {
+    } else if (opts.hint === "duplicates" || opts.hint === "remove_duplicates") {
       const btnDups = container.querySelector("#act-rem-dups");
       if (btnDups) btnDups.click();
     }
@@ -1836,8 +1836,16 @@ async function showOutlierModal(dataset, container, defaultCol = null) {
                   <div style="font-size:3rem; margin-bottom:0.75rem">🎉</div>
                   <div style="font-weight:800; font-size:1.15rem; color:var(--ink); margin-bottom:0.5rem">All Outliers Resolved!</div>
                   <p style="color:var(--ink-faint); font-size:0.875rem; margin-bottom:1.5rem">No remaining unresolved outliers exist in this dataset.</p>
+                  <div style="display:flex; justify-content:center; gap:0.75rem">
+                    <button class="btn btn-primary" id="btn-modal-outlier-back-issues">Return to Issue Center →</button>
+                    <button class="btn btn-secondary" id="btn-modal-outlier-stay">Stay in Cleaning Studio</button>
+                  </div>
                 </div>
               `;
+              const btnBack = wrap.querySelector("#btn-modal-outlier-back-issues");
+              if (btnBack) btnBack.onclick = () => { closeModal(); navigate("issues", { dataset }); };
+              const btnStay = wrap.querySelector("#btn-modal-outlier-stay");
+              if (btnStay) btnStay.onclick = () => closeModal();
             }
             const cancelBtn = document.getElementById("modal-cancel");
             if (cancelBtn) cancelBtn.style.display = "none";
@@ -2128,8 +2136,16 @@ async function showSuspiciousModal(dataset, container, defaultCol = null) {
                   <div style="font-size:3rem; margin-bottom:0.75rem">🎉</div>
                   <div style="font-weight:800; font-size:1.15rem; color:var(--ink); margin-bottom:0.5rem">All Suspicious Values Resolved!</div>
                   <p style="color:var(--ink-faint); font-size:0.875rem; margin-bottom:1.5rem">No remaining unresolved suspicious or invalid values exist in this dataset.</p>
+                  <div style="display:flex; justify-content:center; gap:0.75rem">
+                    <button class="btn btn-primary" id="btn-modal-susp-back-issues">Return to Issue Center →</button>
+                    <button class="btn btn-secondary" id="btn-modal-susp-stay">Stay in Cleaning Studio</button>
+                  </div>
                 </div>
               `;
+              const btnBack = wrap.querySelector("#btn-modal-susp-back-issues");
+              if (btnBack) btnBack.onclick = () => { closeModal(); navigate("issues", { dataset }); };
+              const btnStay = wrap.querySelector("#btn-modal-susp-stay");
+              if (btnStay) btnStay.onclick = () => closeModal();
             }
             const cancelBtn = document.getElementById("modal-cancel");
             if (cancelBtn) cancelBtn.style.display = "none";
